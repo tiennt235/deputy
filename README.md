@@ -1,6 +1,8 @@
-# Deputy
+<p align="center">
+  <img src="docs/social-preview.png" alt="Deputy — delegate outcomes to a crew of Claude Code agents; you hold the gates" width="820">
+</p>
 
-**Delegate outcomes to a crew of Claude Code agents — you hold the gates.**
+# Deputy
 
 Deputy turns Claude Code into a managed, self-running development loop. You describe *what*
 you want (and why) through a web dashboard; a crew of agents plans, builds, verifies, and
