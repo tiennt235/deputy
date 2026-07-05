@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Deputy — delegate outcomes to a crew of Claude Code agents; you hold the gates",
+  "license": "MIT",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
