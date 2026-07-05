@@ -1,0 +1,263 @@
+// Loop Engineering Platform — data model
+// Repo-agnostic: a Project has one or more Repos (mono OR multi-repo).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Project & repos ───────────────────────────
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  memory      String   @default("") // persistent markdown context injected into runs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  repos       Repo[]
+  harnesses   Harness[]
+  skills      Skill[]
+  connectors  Connector[]
+  automations Automation[]
+  tasks       Task[]
+}
+
+enum RepoKind {
+  mono
+  poly_member
+}
+
+model Repo {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  gitUrl        String? // remote (for clone + PR); null = purely local
+  localPath     String // absolute path to the primary clone on disk
+  kind          RepoKind @default(mono)
+  defaultBranch String   @default("main")
+  createdAt     DateTime @default(now())
+
+  worktrees Worktree[]
+  prs       PullRequest[]
+}
+
+// ─────────────────────────── Harness (agent config) ───────────────────────────
+
+model Harness {
+  id               String  @id @default(cuid())
+  projectId        String
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  model            String  @default("sonnet")
+  // Permission policy: { allow: string[], ask: string[], deny: string[], defaultMode: string }
+  permissionPolicy Json    @default("{\"allow\":[\"Read\",\"Grep\",\"Glob\"],\"ask\":[],\"deny\":[],\"defaultMode\":\"default\"}")
+  allowedTools     String[] @default([])
+  systemPromptAppend String @default("")
+  // Programmatic subagent definitions and MCP connector references
+  subagents        Json    @default("{}")
+  connectorIds     String[] @default([])
+  isDefault        Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tasks Task[]
+}
+
+// ─────────────────────────── Skills ───────────────────────────
+
+model Skill {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String // kebab-case; becomes .claude/skills/<name>/SKILL.md
+  description String   @default("")
+  content     String   @default("") // full SKILL.md body
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────── Connectors (MCP) ───────────────────────────
+
+model Connector {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  type      String // "stdio" | "http" | "sdk"
+  config    Json     @default("{}") // McpServerConfig shape
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+// ─────────────────────────── Automations ───────────────────────────
+
+model Automation {
+  id            String   @id @default(cuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name          String
+  cron          String // cron expression
+  triagePrompt  String // prompt used to discover/triage work
+  goalCondition String   @default("") // /goal stop condition
+  harnessId     String?
+  enabled       Boolean  @default(false)
+  lastRunAt     DateTime?
+  createdAt     DateTime @default(now())
+}
+
+// ─────────────────────────── Tasks & lifecycle ───────────────────────────
+
+enum TaskStatus {
+  backlog
+  planning
+  plan_review
+  executing
+  checking
+  changes_requested
+  human_review
+  pr_open
+  done
+  failed
+  cancelled
+}
+
+enum CreatedBy {
+  human
+  automation
+}
+
+model Task {
+  id          String     @id @default(cuid())
+  projectId   String
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String     @default("")
+  status      TaskStatus @default(backlog)
+  harnessId   String?
+  harness     Harness?   @relation(fields: [harnessId], references: [id])
+  repoIds     String[]   @default([]) // which repos this task is scoped to
+  sessionId   String? // primary (maker) SDK session id
+  costUsd     Float      @default(0)
+  inputTokens Int        @default(0)
+  outputTokens Int       @default(0)
+  createdBy   CreatedBy  @default(human)
+  error       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  worktrees   Worktree[]
+  plans       Plan[]
+  runs        Run[]
+  events      AgentEvent[]
+  reviews     Review[]
+  permissions PermissionRequest[]
+  prs         PullRequest[]
+}
+
+model Worktree {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  repoId    String
+  repo      Repo     @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  branch    String
+  path      String
+  status    String   @default("active") // active | committed | removed
+  createdAt DateTime @default(now())
+}
+
+enum PlanStatus {
+  proposed
+  approved
+  rejected
+}
+
+model Plan {
+  id        String     @id @default(cuid())
+  taskId    String
+  task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  content   String     @default("")
+  humanEdits String?
+  status    PlanStatus @default(proposed)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+enum RunRole {
+  maker
+  checker
+  planner
+  triage
+  evidence
+}
+
+model Run {
+  id           String   @id @default(cuid())
+  taskId       String
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  sdkSessionId String?
+  role         RunRole  @default(maker)
+  status       String   @default("running") // running | done | error | interrupted
+  costUsd      Float    @default(0)
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  createdAt    DateTime @default(now())
+  endedAt      DateTime?
+}
+
+model AgentEvent {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  runId     String?
+  type      String // system | assistant_text | thinking | tool_use | tool_result | result | error | status
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  kind      String // checker | human
+  verdict   String // approved | changes_requested | rejected
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model PermissionRequest {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  runId      String?
+  toolUseId  String?
+  toolName   String
+  input      Json     @default("{}")
+  status     String   @default("pending") // pending | allowed | denied
+  decidedBy  String? // human | policy
+  reason     String?
+  createdAt  DateTime @default(now())
+  decidedAt  DateTime?
+}
+
+model PullRequest {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  repoId    String
+  repo      Repo     @relation(fields: [repoId], references: [id], onDelete: Cascade)
+  number    Int?
+  url       String?
+  branch    String
+  status    String   @default("open") // open | merged | closed
+  createdAt DateTime @default(now())
+}

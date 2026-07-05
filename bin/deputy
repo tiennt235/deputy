@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# deputy — talk to one place; a crew of agents does the work.
+# Installs/runs the app; keeps all state in $DEPUTY_HOME (default ~/.deputy).
+#
+#   deputy up        boot the app (DB + API serving the dashboard) at http://localhost:PORT
+#   deputy down      stop the app and the database
+#   deputy status    show health
+#   deputy logs      tail the server log
+#   deputy rebuild   rebuild the web UI
+#
+set -euo pipefail
+
+# ── Resolve the app source dir (this script lives in <src>/bin/deputy) ──
+APP_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+export PATH="$HOME/.npm-global/bin:$PATH"
+
+export DEPUTY_HOME="${DEPUTY_HOME:-$HOME/.deputy}"
+export DEPUTY_PORT="${DEPUTY_PORT:-4000}"
+PID_FILE="$DEPUTY_HOME/deputy.pid"
+LOG_FILE="$DEPUTY_HOME/logs/server.log"
+
+mkdir -p "$DEPUTY_HOME/pgdata" "$DEPUTY_HOME/repos" "$DEPUTY_HOME/worktrees" "$DEPUTY_HOME/logs"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+compose() { (cd "$APP_DIR" && docker compose "$@"); }
+
+start_db() {
+  if docker compose version >/dev/null 2>&1; then
+    echo "▸ Postgres (data in $DEPUTY_HOME/pgdata)…"
+    compose up -d db >/dev/null
+    echo -n "▸ Waiting for Postgres"
+    for _ in $(seq 1 30); do
+      [ "$(docker inspect -f '{{.State.Health.Status}}' deputy-pg 2>/dev/null || echo none)" = "healthy" ] && break
+      echo -n "."; sleep 1
+    done
+    echo " ready"
+  else
+    echo "✗ docker compose not available"; exit 1
+  fi
+}
+
+ensure_build() {
+  if [ ! -d "$APP_DIR/node_modules" ]; then echo "▸ Installing dependencies…"; (cd "$APP_DIR" && pnpm install); fi
+  if [ ! -f "$APP_DIR/apps/web/dist/index.html" ]; then
+    echo "▸ Building dashboard…"; (cd "$APP_DIR" && pnpm --filter @loop/web build >/dev/null)
+  fi
+}
+
+cmd_up() {
+  if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "✓ Already running (pid $(cat "$PID_FILE")) → http://localhost:$DEPUTY_PORT"; exit 0
+  fi
+  have pnpm || { echo "✗ pnpm not found (npm i -g pnpm)"; exit 1; }
+  start_db
+  ensure_build
+  echo "▸ Syncing schema…"; (cd "$APP_DIR" && pnpm db:push >/dev/null 2>&1 || pnpm db:push)
+  if [ ! -f "$DEPUTY_HOME/.seeded" ]; then
+    echo "▸ Seeding demo (first run)…"
+    (cd "$APP_DIR" && pnpm db:seed >/dev/null 2>&1) && touch "$DEPUTY_HOME/.seeded" || true
+  fi
+  echo "▸ Starting server…"
+  (cd "$APP_DIR/apps/api" && DEPUTY_PORT="$DEPUTY_PORT" DEPUTY_HOME="$DEPUTY_HOME" nohup pnpm start >"$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE")
+  for _ in $(seq 1 30); do
+    [ "$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$DEPUTY_PORT/health" 2>/dev/null)" = "200" ] && break
+    sleep 1
+  done
+  echo ""
+  echo "  ✓ Deputy is up → http://localhost:$DEPUTY_PORT"
+  echo "    state: $DEPUTY_HOME   ·   logs: deputy logs   ·   stop: deputy down"
+}
+
+cmd_down() {
+  if [ -f "$PID_FILE" ]; then kill "$(cat "$PID_FILE")" 2>/dev/null || true; rm -f "$PID_FILE"; echo "▸ Server stopped"; fi
+  compose down >/dev/null 2>&1 && echo "▸ Database stopped (data preserved in $DEPUTY_HOME/pgdata)"
+}
+
+cmd_status() {
+  local db srv
+  db=$(docker inspect -f '{{.State.Health.Status}}' deputy-pg 2>/dev/null || echo "down")
+  srv=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$DEPUTY_PORT/health" 2>/dev/null || echo "down")
+  echo "database : $db"
+  echo "server   : $([ "$srv" = "200" ] && echo "up (http://localhost:$DEPUTY_PORT)" || echo "down")"
+  echo "state dir: $DEPUTY_HOME"
+}
+
+case "${1:-up}" in
+  up)      cmd_up ;;
+  down)    cmd_down ;;
+  restart) cmd_down; cmd_up ;;
+  status)  cmd_status ;;
+  logs)    tail -f "$LOG_FILE" ;;
+  rebuild) (cd "$APP_DIR" && pnpm --filter @loop/web build) ;;
+  *) echo "usage: deputy {up|down|restart|status|logs|rebuild}"; exit 1 ;;
+esac

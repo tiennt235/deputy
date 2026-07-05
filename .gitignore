@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+logs/
+.worktrees/
+.data/
+.turbo/
+.DS_Store
+apps/web/dist/
+packages/db/src/generated/

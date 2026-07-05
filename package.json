@@ -1,0 +1,21 @@
+{
+  "name": "deputy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deputy — delegate outcomes to a crew of Claude Code agents; you hold the gates",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "pnpm --filter @loop/api dev",
+    "dev:web": "pnpm --filter @loop/web dev",
+    "db:generate": "pnpm --filter @loop/db generate",
+    "db:push": "pnpm --filter @loop/db push",
+    "db:migrate": "pnpm --filter @loop/db migrate",
+    "db:seed": "pnpm --filter @loop/db seed",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "typescript": "^5.6.3"
+  }
+}
