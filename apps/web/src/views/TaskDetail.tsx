@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { trpc } from "../trpc";
 import { useWs } from "../ws";
-import { StatusPill, money, DiffView, ago } from "../ui";
+import { StatusPill, money, DiffView, Loading, clickable } from "../ui";
 
 interface Ev {
   id: string;
@@ -38,17 +38,18 @@ export function TaskDetail() {
   });
 
   useEffect(() => {
-    streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: "smooth" });
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: reduce ? "auto" : "smooth" });
   }, [events.length]);
 
-  if (!task.data) return <div className="content">Loading…</div>;
+  if (!task.data) return <div className="content"><Loading label="Loading task…" /></div>;
   const t = task.data;
   const active = ["planning", "executing", "checking"].includes(t.status);
 
   return (
     <>
       <div className="topbar">
-        <span className="faint" style={{ cursor: "pointer" }} onClick={() => nav(`/projects/${t.projectId}`)}>
+        <span className="faint" style={{ cursor: "pointer" }} {...clickable(() => nav(`/projects/${t.projectId}`))}>
           {t.project.name} /
         </span>
         <h1>{t.title}</h1>
@@ -331,7 +332,7 @@ function Sidebar({ task }: { task: any }) {
         <div className="card">
           <h3>Pull requests</h3>
           {task.prs.map((pr: any) => (
-            <a key={pr.id} href={pr.url} target="_blank" className="row" style={{ marginBottom: 6 }}>
+            <a key={pr.id} href={pr.url} target="_blank" rel="noreferrer" className="row" style={{ marginBottom: 6 }}>
               <span className="pill st-done">#{pr.number ?? "?"}</span>
               <span className="mono" style={{ fontSize: 12 }}>{pr.branch}</span>
             </a>

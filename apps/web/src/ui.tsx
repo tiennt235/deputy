@@ -59,3 +59,35 @@ export function DiffView({ patch }: { patch: string }) {
 export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="empty">{children}</div>;
 }
+
+/** Skeleton placeholder for content that is still loading (preferred over a spinner). */
+export function Loading({ label = "Loading…" }: { label?: string }) {
+  return (
+    <div className="skeleton-page" role="status" aria-busy="true" aria-label={label}>
+      <span className="skeleton" style={{ height: 20, width: "34%" }} />
+      <span className="skeleton" style={{ height: 64, width: "100%" }} />
+      <span className="skeleton" style={{ height: 64, width: "100%" }} />
+      <span className="skeleton" style={{ height: 64, width: "68%" }} />
+    </div>
+  );
+}
+
+/**
+ * Props that make a non-button element (a clickable div/span) keyboard-operable:
+ * focusable, activatable with Enter/Space, and announced as a button.
+ */
+export function clickable(onActivate: () => void) {
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    onClick: onActivate,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      // Ignore keys bubbling up from inner controls (e.g. a row's own button).
+      if (e.currentTarget !== e.target) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onActivate();
+      }
+    },
+  };
+}

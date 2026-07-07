@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../trpc";
 import { useWs } from "../ws";
-import { StatusPill, ago, Empty } from "../ui";
+import { StatusPill, ago, Empty, clickable } from "../ui";
 
 export function Attention() {
   const nav = useNavigate();
@@ -54,11 +54,11 @@ export function Attention() {
           <div className="col">
             <h2>Human gates</h2>
             {gates.map((t) => (
-              <div className="list-row" key={t.id} onClick={() => nav(`/tasks/${t.id}`)} style={{ cursor: "pointer" }}>
+              <div className="list-row" key={t.id} style={{ cursor: "pointer" }} {...clickable(() => nav(`/tasks/${t.id}`))}>
                 <StatusPill status={t.status} />
                 <div className="col" style={{ gap: 2 }}>
                   <b>{t.title}</b>
-                  <span className="faint" style={{ fontSize: 12 }}>
+                  <span className="submeta">
                     {t.project?.name} · {ago(t.updatedAt)}
                   </span>
                 </div>

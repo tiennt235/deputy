@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { trpc } from "../trpc";
-import { StatusPill, money, ago, Empty } from "../ui";
+import { StatusPill, money, ago, Empty, Loading, clickable } from "../ui";
 
 type Tab = "tasks" | "repos" | "harness" | "skills" | "connectors" | "automations" | "memory";
 
@@ -11,13 +11,13 @@ export function ProjectDetail() {
   const project = trpc.projects.get.useQuery({ id: id! });
   const [tab, setTab] = useState<Tab>("tasks");
 
-  if (!project.data) return <div className="content">Loading…</div>;
+  if (!project.data) return <div className="content"><Loading label="Loading project…" /></div>;
   const p = project.data;
 
   return (
     <>
       <div className="topbar">
-        <span className="faint" style={{ cursor: "pointer" }} onClick={() => nav("/projects")}>
+        <span className="faint" style={{ cursor: "pointer" }} {...clickable(() => nav("/projects"))}>
           Projects /
         </span>
         <h1>{p.name}</h1>
@@ -25,7 +25,12 @@ export function ProjectDetail() {
       <div className="content">
         <div className="tabs">
           {(["tasks", "repos", "harness", "skills", "connectors", "automations", "memory"] as Tab[]).map((t) => (
-            <div key={t} className={`tab ${tab === t ? "active" : ""}`} onClick={() => setTab(t)}>
+            <div
+              key={t}
+              className={`tab ${tab === t ? "active" : ""}`}
+              aria-selected={tab === t}
+              {...clickable(() => setTab(t))}
+            >
               {t[0].toUpperCase() + t.slice(1)}
             </div>
           ))}
@@ -52,17 +57,17 @@ function TasksTab({ projectId, repos, onOpen }: { projectId: string; repos: any[
   const [repoIds, setRepoIds] = useState<string[]>([]);
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "1fr 340px" }}>
+    <div className="split">
       <div className="col">
         {(tasks.data?.length ?? 0) === 0 ? (
           <Empty>No tasks yet. Delegate the first one →</Empty>
         ) : (
           tasks.data!.map((t) => (
-            <div className="list-row" key={t.id} style={{ cursor: "pointer" }} onClick={() => onOpen(t.id)}>
+            <div className="list-row" key={t.id} style={{ cursor: "pointer" }} {...clickable(() => onOpen(t.id))}>
               <StatusPill status={t.status} />
               <div className="col" style={{ gap: 2 }}>
                 <b>{t.title}</b>
-                <span className="faint" style={{ fontSize: 12 }}>
+                <span className="submeta">
                   {money(t.costUsd)} · {ago(t.updatedAt)}
                 </span>
               </div>
@@ -141,7 +146,7 @@ function ReposTab({ projectId, repos, refetch }: { projectId: string; repos: any
   const [kind, setKind] = useState<"mono" | "poly_member">("mono");
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "1fr 340px" }}>
+    <div className="split">
       <div className="col">
         {repos.length === 0 ? (
           <Empty>No repos. Register a local path or git URL — mono or multi-repo, agnostic.</Empty>
@@ -150,7 +155,7 @@ function ReposTab({ projectId, repos, refetch }: { projectId: string; repos: any
             <div className="list-row" key={r.id}>
               <div className="col" style={{ gap: 2 }}>
                 <b>{r.name}</b>
-                <span className="faint mono" style={{ fontSize: 12 }}>
+                <span className="submeta mono">
                   {r.localPath} · {r.kind} · {r.gitUrl ? "remote" : "local-only"}
                 </span>
               </div>
@@ -208,7 +213,7 @@ function HarnessTab({ projectId }: { projectId: string }) {
   const [tools, setTools] = useState<string | null>(null);
   const [sys, setSys] = useState<string | null>(null);
   const [policy, setPolicy] = useState<string | null>(null);
-  if (!h) return <div className="muted">Loading harness…</div>;
+  if (!h) return <Loading label="Loading harness…" />;
 
   const modelV = model ?? h.model;
   const toolsV = tools ?? h.allowedTools.join(", ");
@@ -274,7 +279,7 @@ function SkillsTab({ projectId }: { projectId: string }) {
   const [content, setContent] = useState("");
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "1fr 380px" }}>
+    <div className="split-wide">
       <div className="col">
         {(list.data?.length ?? 0) === 0 ? (
           <Empty>No skills. Skills (SKILL.md) are reusable project knowledge synced into every worktree.</Empty>
@@ -283,7 +288,7 @@ function SkillsTab({ projectId }: { projectId: string }) {
             <div className="list-row" key={s.id}>
               <div className="col" style={{ gap: 2 }}>
                 <b>{s.name}</b>
-                <span className="faint" style={{ fontSize: 12 }}>{s.description || "(no description)"}</span>
+                <span className="submeta">{s.description || "(no description)"}</span>
               </div>
               <span className="spacer" />
               <button className="btn sm bad" onClick={() => del.mutate({ id: s.id })}>Delete</button>
@@ -327,7 +332,7 @@ function ConnectorsTab({ projectId }: { projectId: string }) {
   const [config, setConfig] = useState('{\n  "command": "npx",\n  "args": ["-y", "@modelcontextprotocol/server-github"]\n}');
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "1fr 380px" }}>
+    <div className="split-wide">
       <div className="col">
         {(list.data?.length ?? 0) === 0 ? (
           <Empty>No connectors. Attach MCP servers (GitHub, DB, Slack…) so agents act beyond the filesystem.</Empty>
@@ -336,7 +341,7 @@ function ConnectorsTab({ projectId }: { projectId: string }) {
             <div className="list-row" key={c.id}>
               <div className="col" style={{ gap: 2 }}>
                 <b>{c.name}</b>
-                <span className="faint mono" style={{ fontSize: 12 }}>{c.type}</span>
+                <span className="submeta mono">{c.type}</span>
               </div>
               <span className="spacer" />
               <span className={`pill ${c.enabled ? "st-done" : "st-backlog"}`}>{c.enabled ? "enabled" : "off"}</span>
@@ -381,7 +386,7 @@ function AutomationsTab({ projectId }: { projectId: string }) {
   const [goalCondition, setGoalCondition] = useState("");
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: "1fr 380px" }}>
+    <div className="split-wide">
       <div className="col">
         {(list.data?.length ?? 0) === 0 ? (
           <Empty>No automations. Schedule discovery/triage that files tasks on its own, halting on a goal.</Empty>
@@ -390,7 +395,7 @@ function AutomationsTab({ projectId }: { projectId: string }) {
             <div className="list-row" key={a.id}>
               <div className="col" style={{ gap: 2 }}>
                 <b>{a.name}</b>
-                <span className="faint mono" style={{ fontSize: 12 }}>{a.cron}</span>
+                <span className="submeta mono">{a.cron}</span>
               </div>
               <span className="spacer" />
               <button className="btn sm" disabled={runNow.isPending} onClick={() => runNow.mutate({ id: a.id })}>

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-07T00:00:00Z",
+  "title": "Design System: Deputy",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "#6ea8fe",
+        "tonalRamp": ["#0e1c33", "#173257", "#22497e", "#3061a6", "#4a7fce", "#6ea8fe", "#93c0ff", "#c2ddff"]
+      },
+      "accent-2": {
+        "role": "secondary",
+        "displayName": "Iris",
+        "canonical": "#8b7bff",
+        "tonalRamp": ["#1b1740", "#2a2467", "#3b338f", "#5044b3", "#6a5cd6", "#8b7bff", "#b0a5ff", "#d6d0ff"]
+      },
+      "good": {
+        "role": "tertiary",
+        "displayName": "Verdict Green",
+        "canonical": "#4ec9a3",
+        "tonalRamp": ["#0a2a22", "#0f4234", "#165b49", "#20775f", "#329a7c", "#4ec9a3", "#83dcc0", "#bcefe0"]
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Gate Amber",
+        "canonical": "#e0b657",
+        "tonalRamp": ["#33270a", "#4d3b0f", "#6b5316", "#8c6d1f", "#b3902e", "#e0b657", "#ecca85", "#f6e2ba"]
+      },
+      "bad": {
+        "role": "tertiary",
+        "displayName": "Alert Coral",
+        "canonical": "#e0685f",
+        "tonalRamp": ["#38130f", "#521b16", "#71241e", "#943029", "#bd453b", "#e0685f", "#eb948d", "#f5c4bf"]
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0d1017",
+        "tonalRamp": ["#0d1017", "#141922", "#1b2230", "#232c3d", "#2a3344", "#3a475c", "#67748c", "#9aa7bd"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Signal White",
+        "canonical": "#e6ebf2"
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Stat / metric values only — the loudest type in the system." },
+      "headline": { "displayName": "Headline", "purpose": "Sticky top-bar page title." },
+      "title": { "displayName": "Title", "purpose": "Section headings, card and panel titles." },
+      "body": { "displayName": "Body", "purpose": "Default reading size for prose and controls." },
+      "label": { "displayName": "Label", "purpose": "Uppercase functional micro-labels: nav sections, stat keys, event kickers." },
+      "mono": { "displayName": "Mono", "purpose": "Anything quoted verbatim from the machine: diffs, IDs, configs, agent output." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 8px 30px rgba(0,0,0,0.35)", "purpose": "The only shadow. Reserved for the floating modal dialog to lift it off the dimmed backdrop." }
+    ],
+    "motion": [
+      { "name": "state", "value": "0.12s cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Default ease-out transition for button, nav, tab, and card hover state changes. Collapses to instant under prefers-reduced-motion." },
+      { "name": "spin", "value": "0.7s linear infinite", "purpose": "In-progress spinner rotation." },
+      { "name": "topbar-blur", "value": "blur(8px)", "purpose": "Backdrop blur on the sticky translucent top bar only." },
+      { "name": "shimmer", "value": "1.4s ease-in-out infinite", "purpose": "Skeleton loading placeholder shimmer. Static under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "form-collapse", "value": "900px" },
+      { "name": "detail-collapse", "value": "1100px" },
+      { "name": "content-max", "value": "1200px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The active/primary action — approve, submit, start loop.",
+      "html": "<button class=\"ds-btn-primary\">Start loop</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: var(--radius-sm, 7px); background: var(--accent, #6ea8fe); color: #0b0f17; border: 1px solid transparent; font-weight: 550; cursor: pointer; transition: 0.12s; } .ds-btn-primary:hover { background: #85b6ff; } .ds-btn-primary:focus-visible { outline: 2px solid var(--text, #e6ebf2); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }"
+    },
+    {
+      "name": "Approve (Good) Button",
+      "kind": "button",
+      "refersTo": "button-good",
+      "description": "Gate approval — approve the plan or the diff.",
+      "html": "<button class=\"ds-btn-good\">Approve diff</button>",
+      "css": ".ds-btn-good { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: var(--radius-sm, 7px); background: var(--good, #4ec9a3); color: #06231a; border: 1px solid transparent; font-weight: 550; cursor: pointer; transition: 0.12s; } .ds-btn-good:focus-visible { outline: 2px solid var(--text, #e6ebf2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Destructive (Bad) Button",
+      "kind": "button",
+      "refersTo": "button-bad",
+      "description": "Destructive / reject action — request changes, cancel.",
+      "html": "<button class=\"ds-btn-bad\">Request changes</button>",
+      "css": ".ds-btn-bad { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: var(--radius-sm, 7px); background: transparent; color: var(--bad, #e0685f); border: 1px solid #4a2a2a; font-weight: 550; cursor: pointer; transition: 0.12s; } .ds-btn-bad:hover { background: rgba(224, 104, 95, 0.12); } .ds-btn-bad:focus-visible { outline: 2px solid var(--bad, #e0685f); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Lifecycle-state badge. Amber = awaiting operator; blue = machine working; green = shipped; coral = failed.",
+      "html": "<span class=\"ds-pill ds-pill-review\"><span class=\"ds-dot\"></span>Human review</span>",
+      "css": ".ds-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; } .ds-pill .ds-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; } .ds-pill-review { color: var(--warn, #e0b657); background: rgba(224, 182, 87, 0.13); } .ds-pill-working { color: var(--accent, #6ea8fe); background: rgba(110, 168, 254, 0.12); } .ds-pill-done { color: var(--good, #4ec9a3); background: rgba(78, 201, 163, 0.13); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Recedes below its card — a dark Ink well; border shifts to Signal Blue on focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Describe an outcome…\" />",
+      "css": ".ds-input { width: 100%; padding: 9px 12px; background: var(--bg, #0d1017); color: var(--text, #e6ebf2); border: 1px solid var(--border, #2a3344); border-radius: var(--radius-sm, 7px); outline: none; } .ds-input::placeholder { color: var(--text-dim, #9aa7bd); } .ds-input:focus { border-color: var(--accent, #6ea8fe); }"
+    },
+    {
+      "name": "Task Card",
+      "kind": "card",
+      "refersTo": "task-card",
+      "description": "Board card. Flat at rest; hover brightens the border and lifts 1px. Attention variant (task at a gate) takes a full amber border + faint amber tint — never a side-stripe.",
+      "html": "<div class=\"ds-task-card\"><div class=\"ds-task-title\">Add retry to evidence agent</div><div class=\"ds-task-meta\">planning · 4m ago</div></div>",
+      "css": ".ds-task-card { background: var(--bg-1, #141922); border: 1px solid var(--border-soft, #212938); border-radius: var(--radius-sm, 7px); padding: 12px 13px; cursor: pointer; transition: 0.12s; } .ds-task-card:hover { border-color: var(--border, #2a3344); transform: translateY(-1px); } .ds-task-title { font-weight: 600; margin-bottom: 7px; letter-spacing: -0.01em; color: var(--text, #e6ebf2); } .ds-task-meta { display: flex; gap: 8px; font-size: 11.5px; color: var(--text-faint, #808ca4); }"
+    },
+    {
+      "name": "Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Sidebar navigation row. Muted at rest, fills a lighter navy on hover/active.",
+      "html": "<div class=\"ds-nav-item\">Board</div>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm, 7px); color: var(--text-dim, #9aa7bd); cursor: pointer; font-weight: 500; transition: 0.12s; } .ds-nav-item:hover { background: var(--bg-2, #1b2230); color: var(--text, #e6ebf2); } .ds-nav-item.ds-active { background: var(--bg-3, #232c3d); color: var(--text, #e6ebf2); }"
+    },
+    {
+      "name": "Gate Panel",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The signature component. An amber-bordered block that hosts a plan/diff approval — the one place the operator must act.",
+      "html": "<div class=\"ds-gate\"><div class=\"ds-gate-title\">Approve the diff</div><div class=\"ds-gate-body\">Evidence passed. Checker approved. 3 files changed.</div></div>",
+      "css": ".ds-gate { border: 1px solid var(--warn, #e0b657); background: rgba(224, 182, 87, 0.07); border-radius: var(--radius, 10px); padding: 16px; } .ds-gate-title { color: var(--warn, #e0b657); font-size: 15px; font-weight: 650; margin-bottom: 8px; } .ds-gate-body { color: var(--text-dim, #9aa7bd); font-size: 13px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Control Room",
+    "overview": "Deputy is the console a single operator sits at while a crew of agents does the building. It should feel like a well-run, dimly-lit control room: quiet at rest, dense with live state, and instantly legible under load. Depth comes from stacking four tonal shades of a near-black navy, not from drop shadows. It foregrounds the machinery honestly — diffs as real colored patches, the agent stream as live tool calls and thinking, evidence and checker verdicts in plain view — and never abstracts the work into a cheerful summary.",
+    "keyCharacteristics": [
+      "Deep navy tonal field (#0d1017 → #232c3d), depth by layering not shadow",
+      "Color is semantic and rationed — amber = your turn, blue = the machine working",
+      "Dense, keyboard-first, glanceable; no onboarding scaffolding",
+      "Inter for UI, a monospace stack for anything machine-truthful (diffs, IDs, logs, configs)",
+      "Composed under motion: feedback informs, it never performs busyness"
+    ],
+    "rules": [
+      { "name": "The Amber-Is-Yours Rule", "body": "Gate Amber (#e0b657) is reserved exclusively for states that await the operator — plan review, human review, the gate panel, attention strips. The machine's own working states are always blue. Never spend amber on decoration; it dilutes the one color that means act.", "section": "colors" },
+      { "name": "The Rationed-Accent Rule", "body": "Signal Blue marks the primary path and machine activity, nothing else. If a screen has more than a few blue elements, something non-primary has been miscolored.", "section": "colors" },
+      { "name": "The Tonal-Depth Rule", "body": "Elevation is expressed by climbing the navy ramp, never by adding shadow to inline surfaces. Shadow means 'this floats above the page,' and only the modal earns that.", "section": "elevation" },
+      { "name": "The Machine-Speaks-Mono Rule", "body": "Anything reproduced literally from the system — a diff, an ID, a file path, a config blob, an agent's raw output — is set in the mono stack. Prose about the work is set in Inter. The font boundary tells the operator what is quoted versus what is narrated.", "section": "typography" }
+    ],
+    "dos": [
+      "Do reserve Gate Amber (#e0b657) exclusively for states that need the operator.",
+      "Do express elevation by climbing the navy ramp and hairline borders; keep inline surfaces shadow-free.",
+      "Do set anything quoted verbatim from the machine in the mono stack; narrate about the work in Inter.",
+      "Do keep Signal Blue rationed to the primary path and machine-working states.",
+      "Do pair every state color with its text label and dot; never rely on hue alone.",
+      "Do hold WCAG AA (4.5:1 body); step muted text up to Muted Steel for anything readable."
+    ],
+    "donts": [
+      "Don't ship generic AI-SaaS: no cream hero, no purple-gradient-everything, no hero-metric template, no identical card grids, no tracked uppercase eyebrow above every section.",
+      "Don't turn the agent stream into a consumer chatbot — no chat bubbles, mascots, rounded-everything, or emoji-forward tone. It is telemetry.",
+      "Don't drift into enterprise-Jira clutter: gray-on-gray, deeply nested panels, undifferentiated density.",
+      "Don't cosplay as a terminal: no matrix-green glow, scanlines, or neon cyberpunk aesthetic.",
+      "Don't use a colored border-left/border-right stripe anywhere — there are none in this system. Signal 'needs you' with a full amber border + tint, never a side edge.",
+      "Don't add drop shadows to inline cards or resting chrome; the modal overlay is the only element that earns a shadow.",
+      "Don't introduce a second general-purpose accent; Iris has assigned jobs and Signal Blue owns the primary path."
+    ]
+  }
+}

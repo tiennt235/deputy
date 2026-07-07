@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../trpc";
 import { useWs } from "../ws";
-import { StatusPill, STATUS_LABELS, ago, money, Empty } from "../ui";
+import { StatusPill, ago, money, Empty, clickable } from "../ui";
 
 const COLUMNS: string[] = [
   "backlog",
@@ -50,7 +50,7 @@ export function Board() {
                     <div
                       key={t.id}
                       className={`task-card ${["plan_review", "human_review"].includes(t.status) ? "attn-strip" : ""}`}
-                      onClick={() => nav(`/tasks/${t.id}`)}
+                      {...clickable(() => nav(`/tasks/${t.id}`))}
                     >
                       <div className="title">{t.title}</div>
                       <div className="meta">

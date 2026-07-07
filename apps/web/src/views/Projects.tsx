@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { trpc } from "../trpc";
-import { ago, Empty } from "../ui";
+import { ago, Empty, clickable } from "../ui";
 
 export function Projects() {
   const nav = useNavigate();
@@ -26,10 +26,10 @@ export function Projects() {
         ) : (
           <div className="col">
             {projects.data!.map((p) => (
-              <div className="list-row" key={p.id} style={{ cursor: "pointer" }} onClick={() => nav(`/projects/${p.id}`)}>
+              <div className="list-row" key={p.id} style={{ cursor: "pointer" }} {...clickable(() => nav(`/projects/${p.id}`))}>
                 <div className="col" style={{ gap: 3 }}>
                   <b>{p.name}</b>
-                  <span className="faint" style={{ fontSize: 12 }}>
+                  <span className="submeta">
                     {p.repos.length} repo{p.repos.length === 1 ? "" : "s"} · {p._count.tasks} tasks · {ago(p.createdAt)}
                   </span>
                 </div>
@@ -42,7 +42,12 @@ export function Projects() {
       </div>
 
       {open && (
-        <div className="modal-bg" onClick={() => setOpen(false)}>
+        <div
+          className="modal-bg"
+          onClick={() => setOpen(false)}
+          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+          role="presentation"
+        >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>New project</h2>
             <div className="field">
