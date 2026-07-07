@@ -47,6 +47,13 @@ function harnessPolicy(harness: any): PermissionPolicy {
   return DEFAULT_PERMISSION_POLICY;
 }
 
+/** Subagents imported from `.claude/agents` → SDK `agents` option (only when non-empty). */
+function harnessSubagents(harness: any): Record<string, unknown> | undefined {
+  const raw = harness?.subagents;
+  if (raw && typeof raw === "object" && Object.keys(raw).length > 0) return raw;
+  return undefined;
+}
+
 /** Ensure a worktree exists for every repo the task is scoped to. */
 async function ensureWorktrees(taskId: string): Promise<{ cwd: string; additional: string[] }> {
   const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
@@ -122,6 +129,7 @@ async function runAgent(args: RunAgentArgs): Promise<RunResult> {
     policy: args.policyOverride ?? harnessPolicy(args.harness),
     autoApprove: args.autoApprove,
     systemPromptAppend: args.harness?.systemPromptAppend || undefined,
+    agents: harnessSubagents(args.harness),
     settingSources: ["project"],
     mcpServers,
     resume: args.resume,

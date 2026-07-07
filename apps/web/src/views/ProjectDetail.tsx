@@ -37,7 +37,7 @@ export function ProjectDetail() {
         </div>
 
         {tab === "tasks" && <TasksTab projectId={p.id} repos={p.repos} onOpen={(tid) => nav(`/tasks/${tid}`)} />}
-        {tab === "repos" && <ReposTab projectId={p.id} repos={p.repos} refetch={project.refetch} />}
+        {tab === "repos" && <ReposTab projectId={p.id} repos={p.repos} rootPath={p.rootPath} refetch={project.refetch} />}
         {tab === "harness" && <HarnessTab projectId={p.id} />}
         {tab === "skills" && <SkillsTab projectId={p.id} />}
         {tab === "connectors" && <ConnectorsTab projectId={p.id} />}
@@ -137,16 +137,34 @@ function TasksTab({ projectId, repos, onOpen }: { projectId: string; repos: any[
   );
 }
 
-function ReposTab({ projectId, repos, refetch }: { projectId: string; repos: any[]; refetch: () => void }) {
+function ReposTab({ projectId, repos, rootPath, refetch }: { projectId: string; repos: any[]; rootPath: string | null; refetch: () => void }) {
   const create = trpc.repos.create.useMutation({ onSuccess: () => refetch() });
   const del = trpc.repos.delete.useMutation({ onSuccess: () => refetch() });
+  const updateProject = trpc.projects.update.useMutation({ onSuccess: () => refetch() });
   const [name, setName] = useState("");
   const [gitUrl, setGitUrl] = useState("");
   const [localPath, setLocalPath] = useState("");
   const [kind, setKind] = useState<"mono" | "poly_member">("mono");
+  const [root, setRoot] = useState<string | null>(null);
+  const rootV = root ?? rootPath ?? "";
 
   return (
-    <div className="split">
+    <div className="col">
+      <div className="card">
+        <h2>Project root</h2>
+        <p className="muted" style={{ marginTop: -6 }}>
+          The local dir this project lives in — a single repo, or the folder that holds several repos.
+          Deputy imports <code className="inline">.claude/</code> settings from here and each repo.
+        </p>
+        <div className="row">
+          <input value={rootV} onChange={(e) => setRoot(e.target.value)} placeholder="/home/you/code/myproject" />
+          <button className="btn" disabled={updateProject.isPending} onClick={() => updateProject.mutate({ id: projectId, rootPath: rootV })}>
+            Save
+          </button>
+          {updateProject.isSuccess && <span className="submeta">Saved ✓</span>}
+        </div>
+      </div>
+      <div className="split">
       <div className="col">
         {repos.length === 0 ? (
           <Empty>No repos. Register a local path or git URL — mono or multi-repo, agnostic.</Empty>
@@ -201,6 +219,60 @@ function ReposTab({ projectId, repos, refetch }: { projectId: string; repos: any
           Add repo
         </button>
       </div>
+      </div>
+    </div>
+  );
+}
+
+/** Preview + apply the repo `.claude/` settings import into the default harness. */
+function ImportPanel({ projectId, onDone }: { projectId: string; onDone: () => void }) {
+  const preview = trpc.projects.importPreview.useQuery({ id: projectId }, { enabled: false });
+  const apply = trpc.projects.importApply.useMutation({ onSuccess: () => { onDone(); preview.refetch(); } });
+  const d = preview.data?.imported;
+  const pol = d?.permissionPolicy;
+
+  return (
+    <div className="card">
+      <div className="row">
+        <div className="col" style={{ gap: 2 }}>
+          <h2 style={{ margin: 0 }}>Import from repo settings</h2>
+          <span className="submeta">
+            Reads <code className="inline">.claude/settings.json</code>, <code className="inline">.mcp.json</code>, and agents from the project root and each repo.
+          </span>
+        </div>
+        <span className="spacer" />
+        <button className="btn sm" disabled={preview.isFetching} onClick={() => preview.refetch()}>
+          {preview.isFetching ? "Reading…" : "Preview"}
+        </button>
+      </div>
+      {d && pol && (
+        <>
+          <hr />
+          <div className="col" style={{ gap: 10 }}>
+            <div className="submeta">
+              Sources: {d.sources.map((s) => `${s.label}${s.found ? "" : " (no .claude)"}`).join(" · ") || "none"}
+            </div>
+            <div className="row" style={{ gap: 18, flexWrap: "wrap", fontSize: 13 }}>
+              <span className="muted">model <b className="mono">{d.model ?? "—"}</b></span>
+              <span className="muted">mode <b className="mono">{pol.defaultMode}</b></span>
+              <span className="muted">allow <b>{pol.allow.length}</b></span>
+              <span className="muted">ask <b>{pol.ask.length}</b></span>
+              <span className="muted">deny <b>{pol.deny.length}</b></span>
+              <span className="muted">connectors <b>{d.connectors.length}</b></span>
+              <span className="muted">subagents <b>{Object.keys(d.subagents).length}</b></span>
+              <span className="muted">skills <b>{d.skills.length}</b></span>
+            </div>
+            <div className="row">
+              <span className="faint" style={{ fontSize: 12 }}>Applies policy, model, subagents &amp; connectors to the default harness. Skills &amp; CLAUDE.md stay repo-native.</span>
+              <span className="spacer" />
+              <button className="btn primary sm" disabled={apply.isPending} onClick={() => apply.mutate({ id: projectId })}>
+                {apply.isPending ? "Applying…" : "Apply to harness"}
+              </button>
+              {apply.isSuccess && <span className="submeta" style={{ marginLeft: 8 }}>Imported ✓</span>}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -221,7 +293,9 @@ function HarnessTab({ projectId }: { projectId: string }) {
   const policyV = policy ?? JSON.stringify(h.permissionPolicy, null, 2);
 
   return (
-    <div className="card" style={{ maxWidth: 720 }}>
+    <div className="col" style={{ maxWidth: 720 }}>
+      <ImportPanel projectId={projectId} onDone={list.refetch} />
+      <div className="card">
       <h2>{h.name} harness</h2>
       <p className="muted" style={{ marginTop: -6 }}>
         The harness is the agent's runtime config: model, auto-approved tools, permission policy, and a
@@ -266,6 +340,7 @@ function HarnessTab({ projectId }: { projectId: string }) {
         Save harness
       </button>
       {update.isSuccess && <span className="muted" style={{ marginLeft: 12 }}>Saved ✓</span>}
+      </div>
     </div>
   );
 }

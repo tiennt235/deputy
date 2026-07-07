@@ -1,11 +1,49 @@
+import path from "node:path";
 import { z } from "zod";
 import { prisma } from "@loop/db";
 import { DEFAULT_PERMISSION_POLICY } from "@loop/core";
 import { router, publicProcedure } from "./trpc.js";
 import * as orch from "./orchestrator.js";
 import { reloadScheduler } from "./scheduler.js";
+import { importClaudeSettings } from "./claudeSettings.js";
+import { detectProject, scaffoldProject, suggestPaths } from "./onboarding.js";
+
+/** The dirs whose `.claude/` settings feed a project's harness: root first, then each repo. */
+async function importDirs(projectId: string): Promise<{ label: string; dir: string }[]> {
+  const project = await prisma.project.findUniqueOrThrow({
+    where: { id: projectId },
+    include: { repos: true },
+  });
+  const dirs: { label: string; dir: string }[] = [];
+  const seen = new Set<string>();
+  const add = (label: string, dir: string) => {
+    const abs = path.resolve(dir);
+    if (seen.has(abs)) return;
+    seen.add(abs);
+    dirs.push({ label, dir });
+  };
+  if (project.rootPath) add("project root", project.rootPath);
+  for (const r of project.repos) add(r.name, r.localPath);
+  return dirs;
+}
 
 export const appRouter = router({
+  // ─────────────── Onboarding wizard ───────────────
+  onboarding: router({
+    // Autocomplete real local directories as the user types a path.
+    suggest: publicProcedure
+      .input(z.object({ partial: z.string() }))
+      .query(({ input }) => suggestPaths(input.partial)),
+    // Read-only: inspect a local path and report what onboarding would do.
+    detect: publicProcedure
+      .input(z.object({ path: z.string().min(1) }))
+      .query(({ input }) => detectProject(input.path)),
+    // Confirmed action: create the dir (if missing) + git init with a base commit.
+    scaffold: publicProcedure
+      .input(z.object({ path: z.string().min(1) }))
+      .mutation(({ input }) => scaffoldProject(input.path)),
+  }),
+
   // ─────────────── Projects ───────────────
   projects: router({
     list: publicProcedure.query(() =>
@@ -21,7 +59,7 @@ export const appRouter = router({
       }),
     ),
     create: publicProcedure
-      .input(z.object({ name: z.string().min(1), description: z.string().optional(), memory: z.string().optional() }))
+      .input(z.object({ name: z.string().min(1), description: z.string().optional(), memory: z.string().optional(), rootPath: z.string().optional() }))
       .mutation(async ({ input }) => {
         const project = await prisma.project.create({ data: input });
         // Every project gets a sensible default harness.
@@ -37,7 +75,7 @@ export const appRouter = router({
         return project;
       }),
     update: publicProcedure
-      .input(z.object({ id: z.string(), name: z.string().optional(), description: z.string().optional(), memory: z.string().optional() }))
+      .input(z.object({ id: z.string(), name: z.string().optional(), description: z.string().optional(), memory: z.string().optional(), rootPath: z.string().optional() }))
       .mutation(({ input }) => {
         const { id, ...data } = input;
         return prisma.project.update({ where: { id }, data });
@@ -45,6 +83,62 @@ export const appRouter = router({
     delete: publicProcedure.input(z.object({ id: z.string() })).mutation(({ input }) =>
       prisma.project.delete({ where: { id: input.id } }),
     ),
+
+    // Preview what the repo `.claude/` settings would import into the harness (drift view).
+    importPreview: publicProcedure.input(z.object({ id: z.string() })).query(async ({ input }) => {
+      const dirs = await importDirs(input.id);
+      const imported = await importClaudeSettings(dirs);
+      const harness = await prisma.harness.findFirst({
+        where: { projectId: input.id, isDefault: true },
+      });
+      return {
+        imported,
+        current: harness
+          ? { model: harness.model, permissionPolicy: harness.permissionPolicy }
+          : null,
+      };
+    }),
+
+    // Apply the import: repo `.claude/` → default harness (policy, model, subagents) + connectors.
+    // Skills/CLAUDE.md stay repo-native (loaded by the SDK via settingSources), so they are not
+    // copied into the DB — they are only reported so you can see what was found.
+    importApply: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ input }) => {
+      const dirs = await importDirs(input.id);
+      const imported = await importClaudeSettings(dirs);
+      const harness =
+        (await prisma.harness.findFirst({ where: { projectId: input.id, isDefault: true } })) ??
+        (await prisma.harness.findFirst({ where: { projectId: input.id } }));
+      if (!harness) throw new Error("Project has no harness to import into");
+
+      await prisma.harness.update({
+        where: { id: harness.id },
+        data: {
+          model: imported.model ?? harness.model,
+          permissionPolicy: imported.permissionPolicy as any,
+          subagents: imported.subagents as any,
+        },
+      });
+
+      for (const c of imported.connectors) {
+        const existing = await prisma.connector.findFirst({
+          where: { projectId: input.id, name: c.name },
+        });
+        if (existing) {
+          await prisma.connector.update({ where: { id: existing.id }, data: { type: c.type, config: c.config as any } });
+        } else {
+          await prisma.connector.create({ data: { projectId: input.id, name: c.name, type: c.type, config: c.config as any } });
+        }
+      }
+
+      return {
+        sources: imported.sources,
+        model: imported.model,
+        permissionPolicy: imported.permissionPolicy,
+        connectors: imported.connectors.length,
+        subagents: Object.keys(imported.subagents).length,
+        skills: imported.skills, // repo-native; reported only
+      };
+    }),
   }),
 
   // ─────────────── Repos ───────────────

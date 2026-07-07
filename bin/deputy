@@ -4,6 +4,7 @@
 #
 #   deputy up        boot the app (DB + API serving the dashboard) at http://localhost:PORT
 #   deputy down      stop the app and the database
+#   deputy restart   restart the app server (database keeps running)
 #   deputy status    show health
 #   deputy logs      tail the server log
 #   deputy rebuild   rebuild the web UI
@@ -70,9 +71,21 @@ cmd_up() {
   echo "    state: $DEPUTY_HOME   ·   logs: deputy logs   ·   stop: deputy down"
 }
 
-cmd_down() {
+stop_server() {
   if [ -f "$PID_FILE" ]; then kill "$(cat "$PID_FILE")" 2>/dev/null || true; rm -f "$PID_FILE"; echo "▸ Server stopped"; fi
+}
+
+cmd_down() {
+  stop_server
   compose down >/dev/null 2>&1 && echo "▸ Database stopped (data preserved in $DEPUTY_HOME/pgdata)"
+}
+
+# Restart only the app server; leave Postgres running (no DB downtime).
+# cmd_up is idempotent: it re-ensures the DB, resyncs the schema, and reboots the server.
+cmd_restart() {
+  echo "▸ Restarting server (database stays up)…"
+  stop_server
+  cmd_up
 }
 
 cmd_status() {
@@ -87,7 +100,7 @@ cmd_status() {
 case "${1:-up}" in
   up)      cmd_up ;;
   down)    cmd_down ;;
-  restart) cmd_down; cmd_up ;;
+  restart) cmd_restart ;;
   status)  cmd_status ;;
   logs)    tail -f "$LOG_FILE" ;;
   rebuild) (cd "$APP_DIR" && pnpm --filter @loop/web build) ;;

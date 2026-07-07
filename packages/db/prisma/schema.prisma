@@ -15,6 +15,9 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   description String?
+  // Local dir the project lives in. Single-repo: the repo itself. Multi-repo: the
+  // container dir holding the repos. Root of `.claude/` project-settings import.
+  rootPath    String?
   memory      String   @default("") // persistent markdown context injected into runs
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
