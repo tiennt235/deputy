@@ -12,6 +12,7 @@ export type DetectMode =
   | "existing-plain" // dir exists, no git, no sub-repos → git init here
   | "existing-single" // a single git repo
   | "existing-multi" // a dir containing several git repos
+  | "worktree" // a linked git worktree → register its main repo instead
   | "invalid"; // path is a file, or unreadable
 
 export interface DetectedRepo {
@@ -31,6 +32,7 @@ export interface Detection {
   hasClaudeAtRoot: boolean;
   repos: DetectedRepo[];
   needsScaffold: boolean; // true for missing / existing-plain
+  mainRepoPath?: string; // set when the input path is a linked worktree of another repo
   plan: string[]; // human-readable steps the wizard will perform
 }
 
@@ -42,6 +44,30 @@ function expand(p: string): string {
 
 const isGit = (dir: string) => existsSync(path.join(dir, ".git"));
 const hasClaude = (dir: string) => existsSync(path.join(dir, ".claude")) || existsSync(path.join(dir, ".mcp.json"));
+
+interface GitInfo {
+  isRepo: boolean;
+  isWorktree: boolean;
+  mainRepoPath?: string;
+}
+
+/**
+ * Classify a dir's git status. A linked worktree has a `.git` FILE and a
+ * git-dir under `<main>/.git/worktrees/<name>` that differs from its
+ * common-dir (`<main>/.git`) — so its main repo is `dirname(common-dir)`.
+ */
+async function gitRepoInfo(dir: string): Promise<GitInfo> {
+  if (!existsSync(path.join(dir, ".git"))) return { isRepo: false, isWorktree: false };
+  try {
+    const gitDir = (await execAsync("git rev-parse --absolute-git-dir", { cwd: dir })).stdout.trim();
+    const commonDir = (await execAsync("git rev-parse --path-format=absolute --git-common-dir", { cwd: dir })).stdout.trim();
+    const isWorktree = !!commonDir && path.resolve(gitDir) !== path.resolve(commonDir);
+    return { isRepo: true, isWorktree, mainRepoPath: isWorktree ? path.dirname(commonDir) : undefined };
+  } catch {
+    // .git exists but git couldn't read it — treat as a plain repo, not a worktree.
+    return { isRepo: true, isWorktree: false };
+  }
+}
 
 async function detectBranch(dir: string): Promise<string> {
   for (const cmd of ["git symbolic-ref --short HEAD", "git rev-parse --abbrev-ref HEAD"]) {
@@ -89,8 +115,34 @@ export async function detectProject(input: string): Promise<Detection> {
 
   base.hasClaudeAtRoot = hasClaude(abs);
 
+  const rootGit = await gitRepoInfo(abs);
+
+  // Linked worktree → register its main repo instead of the throwaway worktree.
+  if (rootGit.isRepo && rootGit.isWorktree && rootGit.mainRepoPath) {
+    const main = rootGit.mainRepoPath;
+    const mainName = path.basename(main);
+    const mainClaude = hasClaude(main);
+    return {
+      ...base,
+      exists: true,
+      path: main, // the project points at the real repo, not the worktree
+      mode: "worktree",
+      suggestedName: mainName,
+      hasClaudeAtRoot: mainClaude,
+      needsScaffold: false,
+      mainRepoPath: main,
+      repos: [{ name: mainName, localPath: main, kind: "mono", defaultBranch: await detectBranch(main), hasClaude: mainClaude }],
+      plan: [
+        `${abs} is a git worktree of ${main}`,
+        `Register the main repo ${main} instead`,
+        `Create project "${mainName}"`,
+        ...(mainClaude ? ["Import .claude settings into the harness"] : []),
+      ],
+    };
+  }
+
   // Single git repo?
-  if (isGit(abs)) {
+  if (rootGit.isRepo) {
     return {
       ...base,
       exists: true,
@@ -108,12 +160,17 @@ export async function detectProject(input: string): Promise<Detection> {
   // Container dir: scan immediate subdirs for git repos
   const entries = await readdir(abs, { withFileTypes: true }).catch(() => []);
   const subRepos: DetectedRepo[] = [];
+  let skippedWorktrees = 0;
   for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith(".")) continue;
     const dir = path.join(abs, e.name);
-    if (isGit(dir)) {
-      subRepos.push({ name: e.name, localPath: dir, kind: "poly_member", defaultBranch: await detectBranch(dir), hasClaude: hasClaude(dir) });
+    const gi = await gitRepoInfo(dir);
+    if (!gi.isRepo) continue;
+    if (gi.isWorktree) {
+      skippedWorktrees++; // a linked worktree, not an independent repo — don't register it
+      continue;
     }
+    subRepos.push({ name: e.name, localPath: dir, kind: "poly_member", defaultBranch: await detectBranch(dir), hasClaude: hasClaude(dir) });
   }
 
   if (subRepos.length > 0) {
@@ -126,6 +183,7 @@ export async function detectProject(input: string): Promise<Detection> {
       repos: subRepos,
       plan: [
         `Register ${subRepos.length} repos found under ${abs}`,
+        ...(skippedWorktrees ? [`Skip ${skippedWorktrees} linked git worktree${skippedWorktrees === 1 ? "" : "s"}`] : []),
         `Create multi-repo project "${suggestedName}" (root = ${abs})`,
         ...(anyClaude ? ["Import .claude settings (root + each repo) into the harness"] : []),
       ],

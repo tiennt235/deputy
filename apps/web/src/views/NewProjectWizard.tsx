@@ -16,6 +16,7 @@ const MODE_LABEL: Record<string, string> = {
   "existing-plain": "Exists, no git — will initialize",
   "existing-single": "Existing git repo",
   "existing-multi": "Multi-repo directory",
+  worktree: "Git worktree — will register its main repo",
   invalid: "Not a directory",
 };
 
