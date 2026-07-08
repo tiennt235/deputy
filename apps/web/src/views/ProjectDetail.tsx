@@ -9,7 +9,9 @@ export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const nav = useNavigate();
   const project = trpc.projects.get.useQuery({ id: id! });
+  const del = trpc.projects.delete.useMutation({ onSuccess: () => nav("/projects") });
   const [tab, setTab] = useState<Tab>("tasks");
+  const [confirmDel, setConfirmDel] = useState(false);
 
   if (!project.data) return <div className="content"><Loading label="Loading project…" /></div>;
   const p = project.data;
@@ -21,6 +23,8 @@ export function ProjectDetail() {
           Projects /
         </span>
         <h1>{p.name}</h1>
+        <div className="spacer" />
+        <button className="btn bad sm" onClick={() => setConfirmDel(true)}>Delete project</button>
       </div>
       <div className="content">
         <div className="tabs">
@@ -44,6 +48,31 @@ export function ProjectDetail() {
         {tab === "automations" && <AutomationsTab projectId={p.id} />}
         {tab === "memory" && <MemoryTab project={p} refetch={project.refetch} />}
       </div>
+
+      {confirmDel && (
+        <div
+          className="modal-bg"
+          onClick={() => setConfirmDel(false)}
+          onKeyDown={(e) => e.key === "Escape" && setConfirmDel(false)}
+          role="presentation"
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ width: 460 }}>
+            <h2>Delete project</h2>
+            <p className="muted" style={{ marginTop: -6 }}>
+              Delete <b>{p.name}</b>? This removes its repos, harness, skills, connectors, automations,
+              tasks, and run history. Your actual code on disk is untouched. This can’t be undone.
+            </p>
+            {del.isError && <div className="submeta" style={{ color: "var(--bad)", marginBottom: 10 }}>{del.error.message}</div>}
+            <div className="row">
+              <span className="spacer" />
+              <button className="btn ghost" onClick={() => setConfirmDel(false)}>Cancel</button>
+              <button className="btn bad" disabled={del.isPending} onClick={() => del.mutate({ id: p.id })}>
+                {del.isPending ? "Deleting…" : "Delete project"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
